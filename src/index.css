@@ -1,0 +1,194 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Raleway:wght@300;400&display=swap');
+
+/* ============================================================
+   PISCES RISING — Design System
+   All colors MUST be HSL
+   ============================================================ */
+
+@layer base {
+  :root {
+    /* Core palette — warm dark luxury */
+    --horizon:  27 16% 9%;        /* near-black warm brown  #14110e */
+    --mist:     33 22% 94%;       /* off-white cream        #f0ede8 */
+    --earth:    30 18% 62%;       /* warm mid-tone tan      #b2a08a */
+    --salt:     30 14% 80%;       /* pale warm gray         #d4cfc9 */
+    --mid:      27 14% 14%;       /* slightly lifted dark   #1f1b16 */
+
+    /* Shadcn semantic map */
+    --background:         27 16% 9%;
+    --foreground:         33 22% 94%;
+
+    --card:               27 14% 14%;
+    --card-foreground:    33 22% 94%;
+
+    --popover:            27 14% 14%;
+    --popover-foreground: 33 22% 94%;
+
+    --primary:            33 22% 94%;
+    --primary-foreground: 27 16% 9%;
+
+    --secondary:          27 14% 14%;
+    --secondary-foreground: 33 22% 94%;
+
+    --muted:              27 14% 14%;
+    --muted-foreground:   30 14% 55%;
+
+    --accent:             27 14% 18%;
+    --accent-foreground:  33 22% 94%;
+
+    --destructive:        5 72% 52%;
+    --destructive-foreground: 33 22% 94%;
+
+    --border:             33 10% 16%;
+    --input:              33 10% 16%;
+    --ring:               33 22% 94%;
+
+    --radius:             0rem;
+
+    --sidebar-background: 27 16% 9%;
+    --sidebar-foreground: 33 22% 94%;
+    --sidebar-primary:    33 22% 94%;
+    --sidebar-primary-foreground: 27 16% 9%;
+    --sidebar-accent:     27 14% 14%;
+    --sidebar-accent-foreground: 33 22% 94%;
+    --sidebar-border:     33 10% 16%;
+    --sidebar-ring:       33 22% 94%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: hsl(var(--horizon));
+    color: hsl(var(--mist));
+    font-family: 'Raleway', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-weight: 300;
+    letter-spacing: 0.01em;
+  }
+
+  /* Typography */
+  .font-serif {
+    font-family: 'Cormorant Garamond', 'Georgia', serif;
+  }
+}
+
+/* ============================================================
+   Animations
+   ============================================================ */
+@keyframes breathe {
+  0%, 100% { opacity: 0.14; }
+  50%       { opacity: 0.32; }
+}
+
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@layer utilities {
+  .animate-breathe {
+    animation: breathe 4s ease-in-out infinite;
+  }
+
+  .animate-pageIn {
+    animation: pageIn 0.6s cubic-bezier(0.25, 0, 0, 1) both;
+  }
+
+  .animate-fadeUp {
+    animation: fadeUp 0.7s cubic-bezier(0.25, 0, 0, 1) both;
+  }
+}
+
+/* ============================================================
+   Product swatch placeholders (replace with real images later)
+   ============================================================ */
+.swatch-1 { background: radial-gradient(ellipse at 40% 38%, #2a1f14 0%, transparent 55%), radial-gradient(ellipse at 72% 68%, #1d1410 0%, transparent 50%), #14110e; }
+.swatch-2 { background: radial-gradient(ellipse at 55% 45%, #261c12 0%, transparent 52%), radial-gradient(ellipse at 35% 72%, #1a1510 0%, transparent 48%), #14110e; }
+.swatch-3 { background: radial-gradient(ellipse at 48% 60%, #2d2115 0%, transparent 55%), radial-gradient(ellipse at 68% 32%, #1c1410 0%, transparent 50%), #14110e; }
+.swatch-4 { background: radial-gradient(ellipse at 32% 55%, #231a11 0%, transparent 50%), radial-gradient(ellipse at 65% 40%, #1e1611 0%, transparent 52%), #14110e; }
+.swatch-5 { background: radial-gradient(ellipse at 60% 35%, #2b1e13 0%, transparent 55%), radial-gradient(ellipse at 38% 65%, #1b1410 0%, transparent 48%), #14110e; }
+.swatch-6 { background: radial-gradient(ellipse at 44% 62%, #281d12 0%, transparent 52%), radial-gradient(ellipse at 70% 38%, #1f1611 0%, transparent 50%), #14110e; }
+
+/* Collection swatches */
+.c-swatch-1 { background: radial-gradient(ellipse at 42% 42%, #2a1f14 0%, transparent 55%), radial-gradient(ellipse at 70% 70%, #1a1510 0%, transparent 50%), #14110e; }
+.c-swatch-2 { background: radial-gradient(ellipse at 58% 36%, #261b12 0%, transparent 52%), radial-gradient(ellipse at 33% 68%, #1c1410 0%, transparent 48%), #14110e; }
+.c-swatch-3 { background: radial-gradient(ellipse at 36% 58%, #2d2115 0%, transparent 55%), radial-gradient(ellipse at 66% 34%, #1e1510 0%, transparent 50%), #14110e; }
+.c-swatch-4 { background: radial-gradient(ellipse at 50% 50%, #231a11 0%, transparent 50%), radial-gradient(ellipse at 72% 65%, #1b1410 0%, transparent 52%), #14110e; }
+
+/* ============================================================
+   Flux Configurator form elements
+   ============================================================ */
+.flux-input {
+  @apply w-full bg-transparent border-b text-mist text-[12.5px] tracking-[0.08em] py-[7px] outline-none transition-all duration-200;
+  border-color: rgba(240, 237, 232, 0.14);
+  color: hsl(var(--mist));
+}
+.flux-input:focus {
+  border-color: rgba(240, 237, 232, 0.5);
+}
+.flux-input::placeholder {
+  color: rgba(240, 237, 232, 0.2);
+}
+
+/* Coming soon email input placeholder */
+.coming-soon-input::placeholder {
+  color: rgba(240, 237, 232, 0.45);
+}
+/* Remove number spinners */
+.flux-input[type='number']::-webkit-inner-spin-button,
+.flux-input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; }
+.flux-input[type='number'] { -moz-appearance: textfield; }
+
+.flux-unit {
+  color: rgba(240, 237, 232, 0.28);
+  font-size: 8.5px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.flux-error {
+  color: rgba(210, 130, 110, 0.9);
+  font-size: 8px;
+  letter-spacing: 0.25em;
+  margin-top: 5px;
+}
+
+/* Grain overlay utility */
+.grain-overlay {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+/* Accordion */
+@keyframes comingSoonIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes accordion-down {
+  from { height: 0; }
+  to   { height: var(--radix-accordion-content-height); }
+}
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to   { height: 0; }
+}
