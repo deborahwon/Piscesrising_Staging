@@ -1,7 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useBag } from '@/context/BagContext';
 import { useApp } from '@/context/AppContext';
 import { Product, FLUX_PREMIUM } from '@/data/products';
+import {
+  analyzeField,
+  analyzeBody,
+  parseFluxMeasurements,
+  SEVERITY_COLORS,
+  SEVERITY_BG,
+  type FieldInsight,
+  type FluxIntelligenceResult,
+} from '@/lib/flux-intelligence';
 
 interface FluxPanelProps {
   product: Product | null;
@@ -34,6 +43,18 @@ const SVG_IDS = {
   },
 };
 
+// ─── Percentile Chip sub-component ──────────────────────
+function PercentileChip({ insight }: { insight: FieldInsight }) {
+  return (
+    <span
+      className="text-[7px] tracking-[0.25em] uppercase whitespace-nowrap ml-1 transition-all duration-300"
+      style={{ color: SEVERITY_COLORS[insight.severity] }}
+    >
+      {insight.label}
+    </span>
+  );
+}
+
 export default function FluxPanel({ product, onClose }: FluxPanelProps) {
   const { addToBag } = useBag();
   const { toast } = useApp();
@@ -55,6 +76,39 @@ export default function FluxPanel({ product, onClose }: FluxPanelProps) {
   };
 
   const allPicked = selections.neckline && selections.sleeve && selections.hem;
+
+  // ─── Live field insights (real-time as user types) ────
+  const fieldInsights = useMemo(() => {
+    const insights: Record<string, FieldInsight | null> = {};
+
+    // Height
+    let heightIn = 0;
+    if (heightUnit === 'imperial') {
+      const ft = parseFloat(measurements.heightFt);
+      const inches = parseFloat(measurements.heightIn) || 0;
+      if (ft >= 3 && ft <= 8) heightIn = ft * 12 + inches;
+    } else {
+      const cm = parseFloat(measurements.heightCm);
+      if (cm >= 100 && cm <= 250) heightIn = cm / 2.54;
+    }
+    insights.height = heightIn > 0 ? analyzeField('height', heightIn) : null;
+
+    // Body fields
+    const fields = ['napeWaist', 'waistFloor', 'shoulder', 'bust', 'waist', 'hip'];
+    for (const key of fields) {
+      const v = parseFloat(measurements[key]);
+      insights[key] = v > 0 ? analyzeField(key, v) : null;
+    }
+
+    return insights;
+  }, [measurements, heightUnit]);
+
+  // ─── Full intelligence result (when all fields complete) ──
+  const intelligenceResult: FluxIntelligenceResult | null = useMemo(() => {
+    const parsed = parseFluxMeasurements(measurements, heightUnit);
+    if (!parsed) return null;
+    return analyzeBody(parsed);
+  }, [measurements, heightUnit]);
 
   const validateMeasurements = () => {
     const errs: Record<string, string> = {};
@@ -117,6 +171,15 @@ export default function FluxPanel({ product, onClose }: FluxPanelProps) {
       sleeve: selections.sleeve,
       hem: selections.hem,
       measurements: measureSnapshot,
+      // Attach intelligence data for downstream use
+      ...(intelligenceResult ? {
+        intelligence: {
+          grade: intelligenceResult.grade.value,
+          sizeMismatch: intelligenceResult.sizeMismatch,
+          overrides: intelligenceResult.overrides.length,
+          maxZ: intelligenceResult.maxZ,
+        },
+      } : {}),
     }, product.priceNum + FLUX_PREMIUM);
     onClose();
     toast('Flux order added — made to your measurements');
@@ -151,7 +214,9 @@ export default function FluxPanel({ product, onClose }: FluxPanelProps) {
         {/* Body */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden relative" id="flux-body">
 
-          {/* Step 1 */}
+          {/* ═══════════════════════════════════════════════
+              Step 1: Design
+              ═══════════════════════════════════════════════ */}
           {step === 1 && (
             <div className="flex flex-col md:flex-row h-full">
               {/* SVG Preview */}
@@ -218,14 +283,12 @@ export default function FluxPanel({ product, onClose }: FluxPanelProps) {
                 <div className="text-[7px] tracking-[0.6em] uppercase text-mist opacity-[0.18] mb-7">Design</div>
                 <h2 className="font-serif font-light text-[clamp(1.6rem,2.5vw,2.4rem)] tracking-[0.01em] leading-[1.15] text-mist mb-10">Make it<br />yours.</h2>
 
-                {/* Neckline */}
                 <OptionGroup label="Neckline" options={[
                   { key: 'high', name: 'High', desc: 'Close to the neck, elegant' },
                   { key: 'scoop', name: 'Scoop', desc: 'Open and relaxed' },
                   { key: 'necklace', name: 'Necklace', desc: 'Wide, sitting low on the chest' },
                 ]} selected={selections.neckline} onSelect={v => pick('neckline', v)} />
 
-                {/* Sleeve */}
                 <OptionGroup label="Sleeve" options={[
                   { key: 'sleeveless', name: 'Sleeveless', desc: 'Clean armhole, unencumbered' },
                   { key: 'short', name: 'Short', desc: 'Cap sleeve, above the elbow' },
@@ -233,7 +296,6 @@ export default function FluxPanel({ product, onClose }: FluxPanelProps) {
                   { key: 'long', name: 'Long', desc: 'Full length to the wrist' },
                 ]} selected={selections.sleeve} onSelect={v => pick('sleeve', v)} />
 
-                {/* Hem */}
                 <OptionGroup label="Hem" options={[
                   { key: 'mini', name: 'Mini', desc: 'Above the knee' },
                   { key: 'midi', name: 'Midi', desc: 'Below the knee, above the ankle' },
@@ -243,7 +305,9 @@ export default function FluxPanel({ product, onClose }: FluxPanelProps) {
             </div>
           )}
 
-          {/* Step 2 */}
+          {/* ═══════════════════════════════════════════════
+              Step 2: Measurements + Live Intelligence
+              ═══════════════════════════════════════════════ */}
           {step === 2 && (
             <div className="flex flex-col items-center px-7 py-[52px] overflow-y-auto">
               <div className="w-full max-w-[560px]">
@@ -253,7 +317,10 @@ export default function FluxPanel({ product, onClose }: FluxPanelProps) {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2">
                   {/* Height full width */}
-                  <div className="col-span-full py-[18px] border-b border-[rgba(240,237,232,0.06)]">
+                  <div
+                    className="col-span-full py-[18px] border-b border-[rgba(240,237,232,0.06)]"
+                    style={{ background: fieldInsights.height ? SEVERITY_BG[fieldInsights.height.severity] : 'transparent' }}
+                  >
                     <div className="text-[7px] tracking-[0.55em] uppercase text-mist opacity-[0.22] mb-[10px] flex justify-between items-center">
                       Height
                       <div className="flex">
@@ -267,11 +334,13 @@ export default function FluxPanel({ product, onClose }: FluxPanelProps) {
                         <span className="flux-unit">ft</span>
                         <input className="flux-input w-[50px]" type="number" min="0" max="11" placeholder="7" value={measurements.heightIn} onChange={e => setMeasurements(p => ({ ...p, heightIn: e.target.value }))} />
                         <span className="flux-unit">in</span>
+                        {fieldInsights.height && <PercentileChip insight={fieldInsights.height} />}
                       </div>
                     ) : (
                       <div className="flex gap-2 items-baseline">
                         <input className="flux-input" type="number" min="100" max="250" placeholder="170" value={measurements.heightCm} onChange={e => setMeasurements(p => ({ ...p, heightCm: e.target.value }))} />
                         <span className="flux-unit">cm</span>
+                        {fieldInsights.height && <PercentileChip insight={fieldInsights.height} />}
                       </div>
                     )}
                     {errors.height && <div className="flux-error">{errors.height}</div>}
@@ -284,40 +353,61 @@ export default function FluxPanel({ product, onClose }: FluxPanelProps) {
                     { key: 'bust', label: 'Bust', min: 24, max: 60, placeholder: '35', htw: 'Around the fullest part of your chest, keeping the tape parallel to the floor.' },
                     { key: 'waist', label: 'Waist', min: 18, max: 55, placeholder: '28', htw: 'Around your natural waist — the narrowest part of your torso, typically an inch above your navel.' },
                     { key: 'hip', label: 'Hip', min: 24, max: 70, placeholder: '38', htw: 'Around the fullest part of your hips and seat, keeping the tape parallel to the floor.' },
-                  ].map(f => (
-                    <div key={f.key} className={`py-[18px] border-b border-[rgba(240,237,232,0.06)] ${['napeWaist', 'shoulder', 'bust', 'waist'].includes(f.key) ? 'pr-7 border-r-0 sm:border-r sm:border-[rgba(240,237,232,0.04)]' : 'pl-0 sm:pl-7'}`}>
-                      <div className="text-[7px] tracking-[0.55em] uppercase text-mist opacity-[0.22] mb-[10px]">{f.label}</div>
-                      <div className="flex gap-2 items-baseline">
-                        <input
-                          className={`flux-input ${errors[f.key] ? 'border-[rgba(200,120,100,0.7)]' : ''}`}
-                          type="number"
-                          min={f.min}
-                          max={f.max}
-                          step="0.25"
-                          placeholder={f.placeholder}
-                          value={measurements[f.key]}
-                          onChange={e => setMeasurements(p => ({ ...p, [f.key]: e.target.value }))}
-                        />
-                        <span className="flux-unit">in</span>
-                      </div>
-                      {errors[f.key] && <div className="flux-error">{errors[f.key]}</div>}
-                      <button
-                        className="text-[7px] tracking-[0.3em] text-mist opacity-20 hover:opacity-60 transition-opacity mt-2 block border-b border-[rgba(240,237,232,0.12)]"
-                        onClick={() => setHtwOpen(p => ({ ...p, [f.key]: !p[f.key] }))}
+                  ].map(f => {
+                    const insight = fieldInsights[f.key];
+                    return (
+                      <div
+                        key={f.key}
+                        className={`py-[18px] border-b border-[rgba(240,237,232,0.06)] ${['napeWaist', 'shoulder', 'bust', 'waist'].includes(f.key) ? 'pr-7 border-r-0 sm:border-r sm:border-[rgba(240,237,232,0.04)]' : 'pl-0 sm:pl-7'}`}
+                        style={{ background: insight ? SEVERITY_BG[insight.severity] : 'transparent' }}
                       >
-                        How to measure {htwOpen[f.key] ? '↑' : '↓'}
-                      </button>
-                      {htwOpen[f.key] && (
-                        <div className="text-[9.5px] tracking-[0.07em] leading-[1.85] text-mist opacity-[0.28] mt-2.5 p-3 border border-[rgba(240,237,232,0.05)] bg-[rgba(240,237,232,0.02)]">{f.htw}</div>
-                      )}
-                    </div>
-                  ))}
+                        <div className="text-[7px] tracking-[0.55em] uppercase text-mist opacity-[0.22] mb-[10px]">{f.label}</div>
+                        <div className="flex gap-2 items-baseline">
+                          <input
+                            className={`flux-input ${errors[f.key] ? 'border-[rgba(200,120,100,0.7)]' : ''}`}
+                            type="number"
+                            min={f.min}
+                            max={f.max}
+                            step="0.25"
+                            placeholder={f.placeholder}
+                            value={measurements[f.key]}
+                            onChange={e => setMeasurements(p => ({ ...p, [f.key]: e.target.value }))}
+                          />
+                          <span className="flux-unit">in</span>
+                          {insight && <PercentileChip insight={insight} />}
+                        </div>
+                        {errors[f.key] && <div className="flux-error">{errors[f.key]}</div>}
+                        <button
+                          className="text-[7px] tracking-[0.3em] text-mist opacity-20 hover:opacity-60 transition-opacity mt-2 block border-b border-[rgba(240,237,232,0.12)]"
+                          onClick={() => setHtwOpen(p => ({ ...p, [f.key]: !p[f.key] }))}
+                        >
+                          How to measure {htwOpen[f.key] ? '↑' : '↓'}
+                        </button>
+                        {htwOpen[f.key] && (
+                          <div className="text-[9.5px] tracking-[0.07em] leading-[1.85] text-mist opacity-[0.28] mt-2.5 p-3 border border-[rgba(240,237,232,0.05)] bg-[rgba(240,237,232,0.02)]">{f.htw}</div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
+
+                {/* Live Pattern Intelligence summary bar */}
+                {intelligenceResult && (
+                  <div className="mt-8 p-4 border border-[rgba(240,237,232,0.08)] bg-[rgba(240,237,232,0.02)]">
+                    <div className="text-[7px] tracking-[0.6em] uppercase text-mist opacity-[0.18] mb-3">Pattern Intelligence</div>
+                    <p className="text-[9px] tracking-[0.06em] leading-[1.85] text-mist opacity-[0.4]">{intelligenceResult.summary}</p>
+                    {intelligenceResult.sizeMismatch && (
+                      <p className="text-[8px] tracking-[0.06em] leading-[1.85] mt-2" style={{ color: 'rgba(210,170,110,0.8)' }}>{intelligenceResult.sizeMismatchDetail}</p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* Step 3 */}
+          {/* ═══════════════════════════════════════════════
+              Step 3: Review + Intelligence Summary
+              ═══════════════════════════════════════════════ */}
           {step === 3 && product && (
             <div className="flex flex-col md:flex-row h-full">
               {/* Left: review */}
@@ -325,6 +415,7 @@ export default function FluxPanel({ product, onClose }: FluxPanelProps) {
                 <div className="text-[7px] tracking-[0.6em] uppercase text-mist opacity-[0.18] mb-5">Review</div>
                 <h2 className="font-serif font-light text-[clamp(1.6rem,2.5vw,2.4rem)] tracking-[0.01em] leading-[1.15] text-mist mb-9">Confirm<br />your order.</h2>
 
+                {/* Design review */}
                 <div className="mb-8">
                   <div className="flex justify-between items-baseline text-[7px] tracking-[0.6em] uppercase text-mist opacity-[0.18] mb-3">
                     Design
@@ -338,13 +429,28 @@ export default function FluxPanel({ product, onClose }: FluxPanelProps) {
                   ))}
                 </div>
 
-                <div>
+                {/* Measurements review with percentile column */}
+                <div className="mb-8">
                   <div className="flex justify-between items-baseline text-[7px] tracking-[0.6em] uppercase text-mist opacity-[0.18] mb-3">
                     Measurements
                     <button className="text-mist opacity-30 hover:opacity-80 border-b border-[rgba(240,237,232,0.12)]" onClick={() => setStep(2)}>Edit</button>
                   </div>
-                  <div className="grid grid-cols-2">
-                    {[
+                  {intelligenceResult ? (
+                    intelligenceResult.measurements.map(m => {
+                      const displayVal = m.key === 'height'
+                        ? (heightUnit === 'imperial' ? `${measurements.heightFt}′ ${measurements.heightIn}″` : `${measurements.heightCm} cm`)
+                        : `${m.valueIn}″`;
+                      return (
+                        <div key={m.key} className="flex justify-between items-baseline py-[7px] border-b border-[rgba(240,237,232,0.04)]">
+                          <span className="text-[7.5px] tracking-[0.2em] uppercase text-mist opacity-[0.28] flex-1">{m.label}</span>
+                          <span className="text-[9.5px] tracking-[0.12em] text-mist opacity-70 mr-4">{displayVal}</span>
+                          <span className="text-[7px] tracking-[0.15em] uppercase min-w-[60px] text-right" style={{ color: SEVERITY_COLORS[m.severity] }}>P{m.percentile}</span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    /* Fallback: no intelligence, show raw values */
+                    [
                       ['Height', heightUnit === 'imperial' ? `${measurements.heightFt}′ ${measurements.heightIn}″` : `${measurements.heightCm} cm`],
                       ['Nape to waist', measurements.napeWaist + '″'],
                       ['Waist to floor', measurements.waistFloor + '″'],
@@ -353,13 +459,59 @@ export default function FluxPanel({ product, onClose }: FluxPanelProps) {
                       ['Waist', measurements.waist + '″'],
                       ['Hip', measurements.hip + '″'],
                     ].map(([label, val]) => (
-                      <div key={label} className="flex justify-between items-baseline py-[7px] border-b border-[rgba(240,237,232,0.04)] col-span-2">
+                      <div key={label} className="flex justify-between items-baseline py-[7px] border-b border-[rgba(240,237,232,0.04)]">
                         <span className="text-[7.5px] tracking-[0.2em] uppercase text-mist opacity-[0.28]">{label}</span>
                         <span className="text-[9.5px] tracking-[0.12em] text-mist opacity-70">{val}</span>
                       </div>
-                    ))}
-                  </div>
+                    ))
+                  )}
                 </div>
+
+                {/* Pattern Intelligence panel */}
+                {intelligenceResult && (
+                  <div className="p-5 border border-[rgba(240,237,232,0.08)] bg-[rgba(240,237,232,0.015)]">
+                    <div className="text-[7px] tracking-[0.6em] uppercase text-mist opacity-[0.18] mb-4">Pattern Intelligence</div>
+
+                    {/* Proportions */}
+                    {intelligenceResult.proportions.length > 0 && (
+                      <div className="mb-5">
+                        <div className="text-[7px] tracking-[0.4em] uppercase text-mist opacity-[0.15] mb-2">Proportions</div>
+                        {intelligenceResult.proportions.map(p => (
+                          <div key={p.name} className="flex justify-between items-baseline py-[5px] border-b border-[rgba(240,237,232,0.03)]">
+                            <span className="text-[8px] tracking-[0.1em] text-mist opacity-[0.35]">{p.name}</span>
+                            <span className="text-[8px] tracking-[0.08em] text-mist opacity-50 italic font-serif">{p.interp}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Grade increment */}
+                    <div className="flex justify-between items-baseline py-[6px] border-b border-[rgba(240,237,232,0.05)] mb-3">
+                      <span className="text-[7px] tracking-[0.4em] uppercase text-mist opacity-[0.15]">Grade Increment</span>
+                      <span className="text-[10px] tracking-[0.12em] text-mist opacity-70">{intelligenceResult.grade.value}</span>
+                    </div>
+
+                    {/* Cross-size detection */}
+                    {intelligenceResult.sizeMismatch && (
+                      <div className="py-[6px] border-b border-[rgba(240,237,232,0.05)] mb-3">
+                        <span className="text-[7px] tracking-[0.4em] uppercase block mb-1" style={{ color: 'rgba(210,170,110,0.8)', opacity: 0.85 }}>Cross-size detected</span>
+                        <span className="text-[8px] tracking-[0.06em] leading-[1.8] text-mist opacity-[0.35]">{intelligenceResult.sizeMismatchDetail}</span>
+                      </div>
+                    )}
+
+                    {/* Construction notes from overrides */}
+                    {intelligenceResult.overrides.length > 0 && (
+                      <div>
+                        <div className="text-[7px] tracking-[0.4em] uppercase text-mist opacity-[0.15] mb-2">Construction Notes</div>
+                        {intelligenceResult.overrides.map(o => (
+                          <div key={o.rule} className="py-[5px] border-b border-[rgba(240,237,232,0.03)]">
+                            <span className="text-[8px] tracking-[0.06em] leading-[1.8] text-mist opacity-[0.35]">{o.rec}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Right: price + consent */}
